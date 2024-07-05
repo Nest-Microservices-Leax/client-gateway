@@ -1,0 +1,35 @@
+# Dependencies
+FROM node:21-alpine3.19 as deps
+
+WORKDIR /usr/src/app
+
+COPY package.json ./
+COPY package-lock.json ./
+
+RUN npm install
+
+# Builder - Build the app
+FROM node:21-alpine3.19 as build
+WORKDIR /usr/src/app
+
+# Copy from deps node modules
+COPY --from=deps /usr/src/app/node_modules ./node_modules
+
+# Copy all the code of my app
+COPY . .
+
+# RUM npm run test
+RUN npm run build
+
+RUN npm ci -f --only=production && npm cache clean --force
+
+# Create the final docker image
+FROM node:21-alpine3.19 as prop
+WORKDIR /usr/src/app
+COPY --from=build /usr/src/app/node_modules ./node_modules
+COPY --from=build /usr/src/app/dist ./dist
+ENV NODE_ENV=production
+USER node
+EXPOSE 3000
+CMD ["node", "dist/main.js"]
+
